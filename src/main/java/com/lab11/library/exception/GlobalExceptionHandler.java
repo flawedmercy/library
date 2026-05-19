@@ -13,7 +13,7 @@ import java.util.*;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    // ── 404 Not Found ─────────────────────────────────────────────────────────
+    //404 Not Found
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
         log.error("Resource not found: {}", ex.getMessage());
@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(HttpStatus.NOT_FOUND.value(), ex.getMessage()));
     }
 
-    // ── 409 Conflict ──────────────────────────────────────────────────────────
+    //409 Conflict
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ErrorResponse> handleDuplicate(DuplicateResourceException ex) {
         log.error("Duplicate resource: {}", ex.getMessage());
@@ -29,7 +29,7 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(HttpStatus.CONFLICT.value(), ex.getMessage()));
     }
 
-    // ── 400 Validation errors ─────────────────────────────────────────────────
+    //400 Validation errors
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
@@ -42,7 +42,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    // ── 500 Catch-all ─────────────────────────────────────────────────────────
+    //500 Catch-all
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);
@@ -50,7 +50,7 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(500, "Internal server error"));
     }
 
-    // ── Error Response body ───────────────────────────────────────────────────
+    //Error Response body
     @lombok.Data
     @lombok.AllArgsConstructor
     public static class ErrorResponse {
