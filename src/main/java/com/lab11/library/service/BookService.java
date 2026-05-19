@@ -89,6 +89,7 @@ public class BookService {
         if (request.getIsbn() != null && bookRepository.existsByIsbn(request.getIsbn())) {
             throw new DuplicateResourceException("Book with ISBN " + request.getIsbn() + " already exists");
         }
+
         Author author = authorRepository.findById(request.getAuthorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Author", request.getAuthorId()));
 
