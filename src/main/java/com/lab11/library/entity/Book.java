@@ -22,17 +22,14 @@ public class Book {
 
     private Integer publishedYear;
 
-    // Many-to-One: Books → Author
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", nullable = false)
     private Author author;
 
-    // Many-to-One: Books → Category
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
 
-    // One-to-Many: Book → Reviews
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Review> reviews = new ArrayList<>();
