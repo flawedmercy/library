@@ -1,5 +1,6 @@
 package com.lab11.library.service;
 
+import java.util.Comparator;
 import com.lab11.library.dto.BookDto;
 import com.lab11.library.entity.*;
 import com.lab11.library.exception.*;
@@ -46,42 +47,44 @@ public class BookService {
                                               int size,
                                               String sortBy,
                                               String direction) {
-        Sort sort = direction.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
 
-        Pageable pageable = PageRequest.of(page, size, sort);
+        List<Book> filtered = bookRepository.findAll().stream()
+                .filter(book -> keyword == null || keyword.isBlank()
+                        || book.getTitle().toLowerCase().contains(keyword.toLowerCase())
+                        || book.getIsbn().toLowerCase().contains(keyword.toLowerCase()))
+                .filter(book -> authorId == null
+                        || (book.getAuthor() != null && book.getAuthor().getId().equals(authorId)))
+                .filter(book -> categoryId == null
+                        || (book.getCategory() != null && book.getCategory().getId().equals(categoryId)))
+                .filter(book -> publishedYear == null
+                        || book.getPublishedYear().equals(publishedYear))
+                .toList();
 
-        Specification<Book> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-
-            if (keyword != null && !keyword.isBlank()) {
-                String like = "%" + keyword.toLowerCase() + "%";
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("title")), like),
-                        cb.like(cb.lower(root.get("isbn")), like)
-                ));
-            }
-
-            if (authorId != null) {
-                predicates.add(cb.equal(root.get("author").get("id"), authorId));
-            }
-
-            if (categoryId != null) {
-                predicates.add(cb.equal(root.get("category").get("id"), categoryId));
-            }
-
-            if (publishedYear != null) {
-                predicates.add(cb.equal(root.get("publishedYear"), publishedYear));
-            }
-
-            return cb.and(predicates.toArray(new Predicate[0]));
+        Comparator<Book> comparator = switch (sortBy) {
+            case "id" -> Comparator.comparing(Book::getId);
+            case "isbn" -> Comparator.comparing(Book::getIsbn, Comparator.nullsLast(String::compareToIgnoreCase));
+            case "publishedYear" -> Comparator.comparing(Book::getPublishedYear, Comparator.nullsLast(Integer::compareTo));
+            default -> Comparator.comparing(Book::getTitle, Comparator.nullsLast(String::compareToIgnoreCase));
         };
+
+        if ("desc".equalsIgnoreCase(direction)) {
+            comparator = comparator.reversed();
+        }
+
+        List<BookDto.Response> responses = filtered.stream()
+                .sorted(comparator)
+                .map(this::toResponse)
+                .toList();
+
+        int start = Math.min(page * size, responses.size());
+        int end = Math.min(start + size, responses.size());
+
+        Pageable pageable = PageRequest.of(page, size);
 
         log.info("Searching books keyword={} authorId={} categoryId={} year={} page={} size={} sortBy={} direction={}",
                 keyword, authorId, categoryId, publishedYear, page, size, sortBy, direction);
 
-        return bookRepository.findAll(spec, pageable).map(this::toResponse);
+        return new PageImpl<>(responses.subList(start, end), pageable, responses.size());
     }
 
     @Transactional
