@@ -1,19 +1,24 @@
 package com.lab11.library.service;
 
-import java.util.Comparator;
 import com.lab11.library.dto.BookDto;
-import com.lab11.library.entity.*;
-import com.lab11.library.exception.*;
-import com.lab11.library.repository.*;
-import jakarta.persistence.criteria.Predicate;
+import com.lab11.library.entity.Author;
+import com.lab11.library.entity.Book;
+import com.lab11.library.entity.Category;
+import com.lab11.library.exception.DuplicateResourceException;
+import com.lab11.library.exception.ResourceNotFoundException;
+import com.lab11.library.repository.AuthorRepository;
+import com.lab11.library.repository.BookRepository;
+import com.lab11.library.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.*;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,7 +32,10 @@ public class BookService {
     private final CategoryRepository categoryRepository;
 
     public List<BookDto.Response> findAll() {
-        return bookRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        return bookRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     public BookDto.Response findById(Long id) {
@@ -35,8 +43,10 @@ public class BookService {
     }
 
     public List<BookDto.Response> findByAuthor(Long authorId) {
-        return bookRepository.findByAuthorId(authorId).stream()
-                .map(this::toResponse).collect(Collectors.toList());
+        return bookRepository.findByAuthorId(authorId)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     public Page<BookDto.Response> searchBooks(String keyword,
@@ -48,20 +58,21 @@ public class BookService {
                                               String sortBy,
                                               String direction) {
 
-        List<Book> filtered = bookRepository.findAll().stream()
+        List<Book> filtered = bookRepository.findAll()
+                .stream()
                 .filter(book -> keyword == null || keyword.isBlank()
-                        || book.getTitle().toLowerCase().contains(keyword.toLowerCase())
-                        || book.getIsbn().toLowerCase().contains(keyword.toLowerCase()))
+                        || safeContains(book.getTitle(), keyword)
+                        || safeContains(book.getIsbn(), keyword))
                 .filter(book -> authorId == null
                         || (book.getAuthor() != null && book.getAuthor().getId().equals(authorId)))
                 .filter(book -> categoryId == null
                         || (book.getCategory() != null && book.getCategory().getId().equals(categoryId)))
                 .filter(book -> publishedYear == null
-                        || book.getPublishedYear().equals(publishedYear))
+                        || (book.getPublishedYear() != null && book.getPublishedYear().equals(publishedYear)))
                 .toList();
 
-        Comparator<Book> comparator = switch (sortBy) {
-            case "id" -> Comparator.comparing(Book::getId);
+        Comparator<Book> comparator = switch (sortBy == null ? "title" : sortBy) {
+            case "id" -> Comparator.comparing(Book::getId, Comparator.nullsLast(Long::compareTo));
             case "isbn" -> Comparator.comparing(Book::getIsbn, Comparator.nullsLast(String::compareToIgnoreCase));
             case "publishedYear" -> Comparator.comparing(Book::getPublishedYear, Comparator.nullsLast(Integer::compareTo));
             default -> Comparator.comparing(Book::getTitle, Comparator.nullsLast(String::compareToIgnoreCase));
@@ -76,13 +87,16 @@ public class BookService {
                 .map(this::toResponse)
                 .toList();
 
-        int start = Math.min(page * size, responses.size());
-        int end = Math.min(start + size, responses.size());
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
 
-        Pageable pageable = PageRequest.of(page, size);
+        int start = Math.min(safePage * safeSize, responses.size());
+        int end = Math.min(start + safeSize, responses.size());
+
+        Pageable pageable = PageRequest.of(safePage, safeSize);
 
         log.info("Searching books keyword={} authorId={} categoryId={} year={} page={} size={} sortBy={} direction={}",
-                keyword, authorId, categoryId, publishedYear, page, size, sortBy, direction);
+                keyword, authorId, categoryId, publishedYear, safePage, safeSize, sortBy, direction);
 
         return new PageImpl<>(responses.subList(start, end), pageable, responses.size());
     }
@@ -92,6 +106,7 @@ public class BookService {
         if (request.getIsbn() != null && bookRepository.existsByIsbn(request.getIsbn())) {
             throw new DuplicateResourceException("Book with ISBN " + request.getIsbn() + " already exists");
         }
+
         Author author = authorRepository.findById(request.getAuthorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Author", request.getAuthorId()));
 
@@ -111,6 +126,7 @@ public class BookService {
 
         Book saved = bookRepository.save(book);
         log.info("Created book id={} title={}", saved.getId(), saved.getTitle());
+
         return toResponse(saved);
     }
 
@@ -126,6 +142,7 @@ public class BookService {
 
         Author author = authorRepository.findById(request.getAuthorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Author", request.getAuthorId()));
+
         Category category = null;
         if (request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId())
@@ -139,6 +156,7 @@ public class BookService {
         book.setCategory(category);
 
         log.info("Updated book id={}", id);
+
         return toResponse(bookRepository.save(book));
     }
 
@@ -154,14 +172,19 @@ public class BookService {
                 .orElseThrow(() -> new ResourceNotFoundException("Book", id));
     }
 
-    private BookDto.Response toResponse(Book b) {
+    private boolean safeContains(String source, String keyword) {
+        return source != null && keyword != null
+                && source.toLowerCase().contains(keyword.toLowerCase());
+    }
+
+    private BookDto.Response toResponse(Book book) {
         return BookDto.Response.builder()
-                .id(b.getId())
-                .title(b.getTitle())
-                .isbn(b.getIsbn())
-                .publishedYear(b.getPublishedYear())
-                .authorName(b.getAuthor() != null ? b.getAuthor().getName() : null)
-                .categoryName(b.getCategory() != null ? b.getCategory().getName() : null)
+                .id(book.getId())
+                .title(book.getTitle())
+                .isbn(book.getIsbn())
+                .publishedYear(book.getPublishedYear())
+                .authorName(book.getAuthor() != null ? book.getAuthor().getName() : null)
+                .categoryName(book.getCategory() != null ? book.getCategory().getName() : null)
                 .build();
     }
 }
