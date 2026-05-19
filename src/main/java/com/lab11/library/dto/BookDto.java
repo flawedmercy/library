@@ -3,7 +3,6 @@ package com.lab11.library.dto;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
-
 public class BookDto {
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
