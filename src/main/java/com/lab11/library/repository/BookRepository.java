@@ -8,8 +8,12 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
+
+// Implement repository layer lol
+
 public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificationExecutor<Book> {
     List<Book> findByAuthorId(Long authorId);
     List<Book> findByCategoryId(Long categoryId);
     boolean existsByIsbn(String isbn);
 }
+
