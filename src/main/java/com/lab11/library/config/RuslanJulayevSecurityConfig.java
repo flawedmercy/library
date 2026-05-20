@@ -34,6 +34,10 @@ public class RuslanJulayevSecurityConfig {
                                 "/actuator/health"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/books/**", "/api/authors/**", "/api/categories/**", "/api/reviews/**").permitAll()
+
+                        .requestMatchers(HttpMethod.POST, "/api/authors/**", "/api/books/**", "/api/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/authors/**", "/api/books/**", "/api/categories/**").permitAll()
+
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
