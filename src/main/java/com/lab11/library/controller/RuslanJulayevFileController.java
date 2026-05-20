@@ -1,5 +1,10 @@
 package com.lab11.library.controller;
 
+
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import com.lab11.library.dto.RuslanJulayevFileDto;
 import com.lab11.library.entity.RuslanJulayevFileEntity;
 import com.lab11.library.service.RuslanJulayevFileService;
@@ -7,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -17,9 +21,9 @@ import java.util.List;
 public class RuslanJulayevFileController {
     private final RuslanJulayevFileService fileService;
 
-    @PostMapping("/upload")
-    public ResponseEntity<RuslanJulayevFileDto.Response> upload(@RequestParam("file") MultipartFile file) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(fileService.upload(file));
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(fileService.upload(file));
     }
 
     @GetMapping
